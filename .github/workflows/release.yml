@@ -1,0 +1,31 @@
+name: Build and Publish Lambda
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ARTIFACT_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Build zip
+        run: zip -r function.zip lambda_function.py
+
+      - name: Upload to S3
+        run: |
+          aws s3 cp function.zip \
+            s3://${{ vars.ARTIFACT_BUCKET }}/trello-webhook/${{ github.ref_name }}/function.zip
