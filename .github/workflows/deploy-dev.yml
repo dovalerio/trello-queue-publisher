@@ -1,0 +1,48 @@
+name: deploy-dev
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: read
+
+    env:
+      AWS_REGION: us-east-1
+      BUCKET_NAME: trello-dev-artifacts
+      ARTIFACT_KEY: trello-webhook/function.zip
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # login na AWS via OIDC
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::653738674913:role/trello-dev-github-actions
+          aws-region: ${{ env.AWS_REGION }}
+
+      # build
+      - name: Create zip
+        run: |
+          zip -r function.zip .
+
+      # upload
+      - name: Upload to S3
+        run: |
+          aws s3 cp function.zip s3://${{ env.BUCKET_NAME }}/${{ env.ARTIFACT_KEY }}
+
+      # terraform
+      - name: Terraform Init
+        working-directory: infra/env/dev
+        run: terraform init
+
+      - name: Terraform Apply
+        working-directory: infra/env/dev
+        run: terraform apply -auto-approve
